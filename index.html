@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZIP File Viewer</title>
+    <script>
+        console.log('Attempting to load JSZip...');
+    </script>
+    <script src="dist/jszip.min.js" onload="console.log('JSZip loaded successfully.')" onerror="console.log('Failed to load JSZip.')"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center h-screen">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
+        <h2 class="text-xl font-bold mb-4">ZIP File Viewer</h2>
+        <input type="file" id="zipFileInput" class="mb-4 border p-2 w-full">
+        <ul id="fileList" class="text-left text-sm"></ul>
+        <textarea id="logOutput" class="w-full mt-4 p-2 border text-sm h-40" readonly></textarea>
+    </div>
+    
+    <script>
+        document.getElementById('zipFileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const logOutput = document.getElementById('logOutput');
+            if (!file) return;
+            
+            logOutput.value = `Loading file: ${file.name}\n`;
+            console.log('Loading file:', file.name);
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                logOutput.value += 'File read successfully. Processing...\n';
+                console.log('File read successfully.');
+                
+                if (typeof JSZip === 'undefined') {
+                    logOutput.value += 'JSZip is not loaded!\n';
+                    console.log('JSZip is not loaded!');
+                    return;
+                }
+                
+                JSZip.loadAsync(e.target.result).then(function(zip) {
+                    logOutput.value += 'ZIP file loaded successfully.\n';
+                    console.log('ZIP file loaded successfully.');
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = '';
+                    Object.keys(zip.files).forEach(function(filename) {
+                        logOutput.value += `Found file: ${filename}\n`;
+                        console.log('Found file:', filename);
+                        const li = document.createElement('li');
+                        li.textContent = filename;
+                        
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.textContent = 'Download';
+                        downloadBtn.classList.add('ml-2', 'text-blue-500', 'underline', 'cursor-pointer');
+                        downloadBtn.onclick = function() {
+                            zip.files[filename].async('blob').then(function(blob) {
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = filename;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            });
+                        };
+                        
+                        li.appendChild(downloadBtn);
+                        fileList.appendChild(li);
+                    });
+                }).catch(function(error) {
+                    logOutput.value += `Error loading ZIP: ${error.message}\n`;
+                    console.error('Error loading ZIP:', error);
+                });
+            };
+            reader.onerror = function(event) {
+                logOutput.value += `Error reading file: ${event.target.error.name}\n`;
+                console.error('Error reading file:', event.target.error);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    </script>
+</body>
+</html>
