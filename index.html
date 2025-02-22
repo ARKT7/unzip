@@ -3,80 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZIP File Viewer</title>
-    <script>
-        console.log('Attempting to load JSZip...');
-    </script>
-    <script src="dist/jszip.min.js" onload="console.log('JSZip loaded successfully.')" onerror="console.log('Failed to load JSZip.')"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>ZIP File Explorer</title>
+    <script src="dist/jszip.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #007aff, #00c6ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            width: 600px;
+            height: 500px;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h1 {
+            font-size: 26px;
+            margin-bottom: 20px;
+            color: #007aff;
+        }
+        input { display: none; }
+        .custom-file-upload {
+            display: inline-block;
+            padding: 14px 28px;
+            cursor: pointer;
+            background: #007aff;
+            color: white;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .custom-file-upload:hover {
+            background: #005ecb;
+        }
+        #file-list {
+            margin-top: 20px;
+            text-align: left;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 10px;
+            background: #f9f9f9;
+            padding: 15px;
+        }
+        .folder, .file-item {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: 0.3s;
+        }
+        .folder:hover, .file-item:hover {
+            background: #e3e3e3;
+        }
+        .download-btn {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .download-btn:hover {
+            background: #005ecb;
+        }
+        .error-message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.8);
+            background: red;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            opacity: 0;
+            transition: 0.5s;
+        }
+        .error-message.show {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center h-screen">
-    <div class="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
-        <h2 class="text-xl font-bold mb-4">ZIP File Viewer</h2>
-        <input type="file" id="zipFileInput" class="mb-4 border p-2 w-full">
-        <ul id="fileList" class="text-left text-sm"></ul>
-        <textarea id="logOutput" class="w-full mt-4 p-2 border text-sm h-40" readonly></textarea>
+<body>
+    <div class="error-message" id="error-message">File is too large!</div>
+    <div class="container">
+        <h1>ZIP File Explorer</h1>
+        <label for="zipFileInput" class="custom-file-upload">Choose ZIP File</label>
+        <input type="file" id="zipFileInput" accept=".zip">
+        <div id="file-list"></div>
     </div>
-    
     <script>
+        let zipInstance;
         document.getElementById('zipFileInput').addEventListener('change', function(event) {
             const file = event.target.files[0];
-            const logOutput = document.getElementById('logOutput');
-            if (!file) return;
-            
-            logOutput.value = `Loading file: ${file.name}\n`;
-            console.log('Loading file:', file.name);
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                logOutput.value += 'File read successfully. Processing...\n';
-                console.log('File read successfully.');
-                
-                if (typeof JSZip === 'undefined') {
-                    logOutput.value += 'JSZip is not loaded!\n';
-                    console.log('JSZip is not loaded!');
+            if (file) {
+                if (file.size > 2147483648) { // 2GB limit
+                    showError("ZIP file is too large to process!");
                     return;
                 }
-                
-                JSZip.loadAsync(e.target.result).then(function(zip) {
-                    logOutput.value += 'ZIP file loaded successfully.\n';
-                    console.log('ZIP file loaded successfully.');
-                    const fileList = document.getElementById('fileList');
-                    fileList.innerHTML = '';
-                    Object.keys(zip.files).forEach(function(filename) {
-                        logOutput.value += `Found file: ${filename}\n`;
-                        console.log('Found file:', filename);
-                        const li = document.createElement('li');
-                        li.textContent = filename;
-                        
-                        const downloadBtn = document.createElement('button');
-                        downloadBtn.textContent = 'Download';
-                        downloadBtn.classList.add('ml-2', 'text-blue-500', 'underline', 'cursor-pointer');
-                        downloadBtn.onclick = function() {
-                            zip.files[filename].async('blob').then(function(blob) {
-                                const link = document.createElement('a');
-                                link.href = URL.createObjectURL(blob);
-                                link.download = filename;
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                            });
-                        };
-                        
-                        li.appendChild(downloadBtn);
-                        fileList.appendChild(li);
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    JSZip.loadAsync(event.target.result, { createFolders: true }).then(function(zip) {
+                        zipInstance = zip;
+                        displayFolderContents('');
+                    }).catch(function(error) {
+                        showError("Error reading ZIP file: " + error.message);
                     });
-                }).catch(function(error) {
-                    logOutput.value += `Error loading ZIP: ${error.message}\n`;
-                    console.error('Error loading ZIP:', error);
-                });
-            };
-            reader.onerror = function(event) {
-                logOutput.value += `Error reading file: ${event.target.error.name}\n`;
-                console.error('Error reading file:', event.target.error);
-            };
-            reader.readAsArrayBuffer(file);
+                };
+                reader.readAsArrayBuffer(file);
+            }
         });
+        function displayFolderContents(folderPath) {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = folderPath ? `<button onclick="displayFolderContents('')" class="download-btn">⬅ Back</button>` : '';
+            Object.keys(zipInstance.files).forEach(function(fileName) {
+                if (fileName.startsWith(folderPath) && fileName !== folderPath) {
+                    const relativeName = fileName.substring(folderPath.length);
+                    if (relativeName.includes('/') && relativeName.split('/').length === 2) {
+                        const folderName = relativeName.split('/')[0];
+                        const folderDiv = document.createElement('div');
+                        folderDiv.className = 'folder';
+                        folderDiv.innerHTML = `📁 ${folderName}`;
+                        folderDiv.onclick = () => displayFolderContents(folderPath + folderName + '/');
+                        if (!fileList.innerHTML.includes(folderDiv.innerHTML)) {
+                            fileList.appendChild(folderDiv);
+                        }
+                    } else if (!relativeName.includes('/')) {
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'file-item';
+                        fileItem.innerHTML = `<span>${relativeName}</span> <button class="download-btn" onclick="downloadFile('${fileName}')">Download</button>`;
+                        fileList.appendChild(fileItem);
+                    }
+                }
+            });
+        }
+        function downloadFile(fileName) {
+            const file = zipInstance.files[fileName];
+            if (!file) return;
+            file.async('blob').then(function(blob) {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName.split('/').pop();
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        }
+        function showError(message) {
+            const errorBox = document.getElementById('error-message');
+            errorBox.textContent = message;
+            errorBox.classList.add('show');
+            setTimeout(() => errorBox.classList.remove('show'), 3000);
+        }
     </script>
 </body>
 </html>
